@@ -8,20 +8,7 @@ import io
 from docx import Document
 import PyPDF2
 import traceback
-import torch
-from transformers import AutoTokenizer, AutoModel
-from .ml_model.grading_model import AIGrader
-
-def process_document(content: bytes, filename: str) -> str:
-    """Convert document content to text based on file type."""
-    if filename.endswith('.pdf'):
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        return ' '.join(page.extract_text() for page in pdf_reader.pages)
-    elif filename.endswith('.docx'):
-        doc = Document(io.BytesIO(content))
-        return ' '.join(paragraph.text for paragraph in doc.paragraphs)
-    else:
-        return content.decode('utf-8')
+from ml_model.grading_model import AIGrader
 
 app = FastAPI()
 
@@ -43,48 +30,79 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 # Setup templates
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+def process_document(content: bytes, filename: str) -> str:
+    """Convert document content to text based on file type."""
+    try:
+        if filename.endswith('.pdf'):
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            return ' '.join(page.extract_text() for page in pdf_reader.pages)
+        elif filename.endswith('.docx'):
+            doc = Document(io.BytesIO(content))
+            return ' '.join(paragraph.text for paragraph in doc.paragraphs)
+        else:
+            return content.decode('utf-8')
+    except Exception as e:
+        print(f"Error processing {filename}: {str(e)}")
+        raise Exception(f"Could not process {filename}. Make sure it's a valid PDF or DOCX file.")
+
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
+async def read_root(request: Request):
     return templates.TemplateResponse(
         "index.html",
         {"request": request}
     )
 
-# app/main.py - Update the analyze endpoint
 @app.post("/analyze")
 async def analyze_assignment(
     rubric: UploadFile = File(...),
     assignment: UploadFile = File(...)
 ):
+    # Add file size check (5MB limit)
+    MAX_FILE_SIZE = 5 * 1024 * 1024
+    
     try:
-        print("Starting assignment analysis process...")
+        print(f"Received files: {rubric.filename}, {assignment.filename}")
         
-        # Read files
-        rubric_text = await rubric.read()
-        assignment_text = await rubric.read()
+        # Check and read rubric
+        print("Reading rubric file...")
+        rubric_content = await rubric.read()
+        if len(rubric_content) > MAX_FILE_SIZE:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Rubric file too large. Please keep files under 5MB."}
+            )
+            
+        # Check and read assignment
+        print("Reading assignment file...")
+        assignment_content = await assignment.read()
+        if len(assignment_content) > MAX_FILE_SIZE:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Assignment file too large. Please keep files under 5MB."}
+            )
 
-        # Convert bytes to text
-        rubric_text = process_document(rubric_text, rubric.filename)
-        assignment_text = process_document(assignment_text, assignment.filename)
+        print("Converting files to text...")
+        rubric_text = process_document(rubric_content, rubric.filename)
+        assignment_text = process_document(assignment_content, assignment.filename)
 
-        # Initialize and use grader
+        print("Initializing grader...")
         grader = AIGrader()
+        
+        print("Starting analysis...")
         results = grader.analyze_rubric_and_assignment(rubric_text, assignment_text)
 
-        return JSONResponse(
-            content={
-                "message": "Analysis completed",
-                "results": results
-            }
-        )
+        print("Analysis complete")
+        return JSONResponse(content=results)
 
     except Exception as e:
-        print(f"Error during analysis: {str(e)}")
+        error_msg = f"Error during analysis: {str(e)}"
+        print(error_msg)
         print(traceback.format_exc())
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)}
+            content={"error": error_msg}
         )
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
