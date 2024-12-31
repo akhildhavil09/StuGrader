@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Analyzer</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .upload-section:hover {
+            border-color: #007bff;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .feedback-section {
+            margin-bottom: 20px;
+        }
+        .feedback-item {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .status-met {
+            color: #28a745;
+        }
+        .status-partial {
+            color: #ffc107;
+        }
+        .status-not-met {
+            color: #dc3545;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        function App() {
+            const [files, setFiles] = React.useState({});
+            const [results, setResults] = React.useState(null);
+            const [loading, setLoading] = React.useState(false);
+            const [error, setError] = React.useState(null);
+
+            const handleFileChange = (event, type) => {
+                setFiles(prev => ({
+                    ...prev,
+                    [type]: event.target.files[0]
+                }));
+            };
+
+            const handleSubmit = async (event) => {
+                event.preventDefault();
+                setLoading(true);
+                setError(null);
+
+                const formData = new FormData();
+                formData.append('rubric', files.rubric);
+                formData.append('assignment', files.assignment);
+
+                try {
+                    const response = await fetch('/analyze', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Analysis failed');
+                    }
+
+                    setResults(data);
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const getStatusColor = (status) => {
+                switch(status) {
+                    case 'Met': return 'status-met';
+                    case 'Partially Met': return 'status-partial';
+                    case 'Not Met': return 'status-not-met';
+                    default: return '';
+                }
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>Assignment Analyzer</h1>
+                    </div>
+
+                    <form onSubmit={handleSubmit}>
+                        <div className="upload-section">
+                            <h3>Upload Rubric</h3>
+                            <input 
+                                type="file" 
+                                onChange={(e) => handleFileChange(e, 'rubric')} 
+                                accept=".pdf,.doc,.docx,.txt"
+                            />
+                        </div>
+
+                        <div className="upload-section">
+                            <h3>Upload Assignment</h3>
+                            <input 
+                                type="file" 
+                                onChange={(e) => handleFileChange(e, 'assignment')} 
+                                accept=".pdf,.doc,.docx,.txt"
+                            />
+                        </div>
+
+                        <button 
+                            className="button"
+                            type="submit" 
+                            disabled={loading || !files.rubric || !files.assignment}
+                        >
+                            {loading ? 'Analyzing...' : 'Analyze Assignment'}
+                        </button>
+                    </form>
+
+                    {error && (
+                        <div className="feedback-item status-not-met">
+                            Error: {error}
+                        </div>
+                    )}
+
+                    {loading && (
+                        <div className="loading">
+                            Analyzing your assignment... Please wait...
+                        </div>
+                    )}
+
+                    {results && (
+                        <div className="results">
+                            <div className="score">
+                                Score: {results.score}%
+                            </div>
+
+                            <div className="feedback-section">
+                                <h3>Detailed Feedback</h3>
+                                {results.detailed_feedback.map((feedback, index) => (
+                                    <div key={index} className="feedback-item">
+                                        <h4 className={getStatusColor(feedback.status)}>
+                                            {feedback.requirement}
+                                        </h4>
+                                        <p>Status: <span className={getStatusColor(feedback.status)}>{feedback.status}</span></p>
+                                        <p>Points: {feedback.points_earned}/{feedback.points_possible}</p>
+                                        <p>{feedback.feedback}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="feedback-section">
+                                <h3>Overall Feedback</h3>
+                                <div className="feedback-item">
+                                    <h4>Strengths</h4>
+                                    <ul>
+                                        {results.overall_feedback.strengths.map((strength, index) => (
+                                            <li key={index}>{strength}</li>
+                                        ))}
+                                    </ul>
+
+                                    <h4>Areas for Improvement</h4>
+                                    <ul>
+                                        {results.overall_feedback.areas_for_improvement.map((area, index) => (
+                                            <li key={index}>{area}</li>
+                                        ))}
+                                    </ul>
+
+                                    <p><strong>Summary:</strong> {results.overall_feedback.summary}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
