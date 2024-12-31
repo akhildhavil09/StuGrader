@@ -109,6 +109,8 @@
                 }));
             };
 
+            // Update the handleSubmit function in your index.html
+
             const handleSubmit = async (event) => {
                 event.preventDefault();
                 setLoading(true);
@@ -124,15 +126,23 @@
                         body: formData,
                     });
 
-                    const data = await response.json();
-                    
+                    // Check if response is OK
                     if (!response.ok) {
-                        throw new Error(data.error || 'Analysis failed');
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
+                    // Check the content type
+                    const contentType = response.headers.get("content-type");
+                    if (!contentType || !contentType.includes("application/json")) {
+                        throw new TypeError("Response was not JSON");
+                    }
+
+                    const data = await response.json();
                     setResults(data);
+                    
                 } catch (err) {
-                    setError(err.message);
+                    console.error('Error:', err);
+                    setError(`Error uploading files: ${err.message}. Please try again with smaller files or check file format.`);
                 } finally {
                     setLoading(false);
                 }

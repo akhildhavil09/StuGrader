@@ -59,8 +59,9 @@ async def analyze_assignment(
     try:
         print("Starting assignment analysis process...")
         
+        # Read files
         rubric_text = await rubric.read()
-        assignment_text = await assignment.read()
+        assignment_text = await rubric.read()
 
         # Convert bytes to text
         rubric_text = process_document(rubric_text, rubric.filename)
@@ -70,7 +71,12 @@ async def analyze_assignment(
         grader = AIGrader()
         results = grader.analyze_rubric_and_assignment(rubric_text, assignment_text)
 
-        return results
+        return JSONResponse(
+            content={
+                "message": "Analysis completed",
+                "results": results
+            }
+        )
 
     except Exception as e:
         print(f"Error during analysis: {str(e)}")
