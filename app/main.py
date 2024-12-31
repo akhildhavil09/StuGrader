@@ -10,7 +10,7 @@ import PyPDF2
 import traceback
 import torch
 from transformers import AutoTokenizer, AutoModel
-from ml_model.grading_model import AIGrader  # Import our custom grader
+from .ml_model.grading_model import AIGrader
 
 def process_document(content: bytes, filename: str) -> str:
     """Convert document content to text based on file type."""
