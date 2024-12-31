@@ -1,5 +1,4 @@
 # app/ml_model/__init__.py
-from .model import AssignmentAnalyzer
-from .text_processor import TextProcessor
+from .grading_model import AIGrader
 
-__all__ = ['AssignmentAnalyzer', 'TextProcessor']
+__all__ = ['AIGrader']
