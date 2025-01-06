@@ -74,7 +74,7 @@ class AIGrader:
             results.append({
                 'requirement': criterion['requirement'],
                 'points_possible': criterion['points'],
-                'points_earned': points_earned,
+                'points_earned': round(points_earned),
                 'fulfillment_level': requirement_met['level'],
                 'feedback': requirement_met['feedback'],
                 'improvement_suggestions': requirement_met['suggestions']
@@ -82,11 +82,12 @@ class AIGrader:
         
         return {
             'score': round((earned_points / total_points) * 100, 1) if total_points > 0 else 0,
-            'points_earned': earned_points,
-            'total_points': total_points,
+            'points_earned': round(earned_points, 2),  # Round points earned to 2 decimal places
+            'total_points': round(total_points, 2),   # Round total points to 2 decimal places
             'detailed_feedback': results,
             'overall_feedback': self._generate_overall_feedback(results)
         }
+
 
     def _get_text_embedding(self, text: str) -> torch.Tensor:
         """Generates BERT embeddings for text comparison."""
