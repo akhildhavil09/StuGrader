@@ -8,7 +8,7 @@ import io
 from docx import Document
 import PyPDF2
 import traceback
-from ml_model.grading_model import AIGrader
+from .ml_model.grading_model import AIGrader
 
 app = FastAPI()
 
